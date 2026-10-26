@@ -39,9 +39,13 @@ def _reset_shared_http_client():
     portal.webhooks.worker.webhook_worker_loop = _dummy_loop
     portal.webhooks.worker.enqueue_webhook = _dummy_enqueue
 
+    import portal.rate_limit as _rl
+
     pg.shared_http_client = None
+    _rl._rates.clear()
     yield
     pg.shared_http_client = None
+    _rl._rates.clear()
     portal.webhooks.worker.webhook_worker_loop = original_loop
     portal.webhooks.worker.enqueue_webhook = original_enqueue
 

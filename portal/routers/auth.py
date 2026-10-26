@@ -53,7 +53,7 @@ from portal.notifications import queue_notification
 from portal.rate_limit import check_rate_limit
 from portal.schemas.auth import TokenRequest, TokenResponse
 from portal.user_menu import resolve_user_menu, user_menu_context
-from portal.utils import safe_redirect, verify_same_origin
+from portal.utils import get_client_ip, safe_redirect, verify_same_origin
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(
@@ -193,6 +193,18 @@ async def register_page(request: Request):
 
 @router.post("/register")
 async def register_submit(request: Request):
+    client_ip = get_client_ip(request)
+    if not check_rate_limit("register", client_ip, max_requests=10, window_seconds=3600):
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "errors": ["Too many registration attempts from this IP. Please try again later."],
+                "js_version": _JS_CACHE_BUST,
+            },
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
     form = await request.form()
     email = form.get("email", "").strip().lower()
     display_name = form.get("display_name", "").strip()

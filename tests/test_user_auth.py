@@ -123,6 +123,34 @@ class TestRegistration:
         assert b"already exists" not in resp.content
 
     @pytest.mark.anyio
+    async def test_register_rate_limited_per_ip(self, setup_db):
+        async with _client() as c:
+            for i in range(10):
+                resp = await c.post(
+                    "/register",
+                    data={
+                        "email": f"ratelimit_{i}@example.com",
+                        "display_name": f"User {i}",
+                        "password": "",
+                        "password_confirm": "",
+                    },
+                )
+                assert resp.status_code == 200
+
+            # 11th request from same IP should be rejected with 429
+            blocked = await c.post(
+                "/register",
+                data={
+                    "email": "ratelimit_blocked@example.com",
+                    "display_name": "Blocked User",
+                    "password": "",
+                    "password_confirm": "",
+                },
+            )
+            assert blocked.status_code == 429
+            assert b"Too many registration attempts from this IP" in blocked.content
+
+    @pytest.mark.anyio
     async def test_duplicate_unverified_registration_queues_once(self, setup_db):
         from sqlalchemy import select
 
